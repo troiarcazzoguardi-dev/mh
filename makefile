@@ -1,15 +1,29 @@
-CC=gcc
-CFLAGS=-O2 -Wall
-CLANG=clang
-CLANGFLAGS=-O2 -target bpf -c
+CC = gcc
+CFLAGS = -O2 -Wall
+LDFLAGS = -lpthread -lbpf
 
-all: tx_program xdp_tx_kern.o
+# Solo se vuoi compilare BPF/XDP
+CLANG = clang
+BPF_CFLAGS = -O2 -g -target bpf \
+	-I/lib/modules/$(shell uname -r)/build/include \
+	-I/usr/include
 
-tx_program: main.c xdp_tx_kern.o
-	$(CC) $(CFLAGS) -o tx_program main.c -lpthread -lbpf
+SRC_MAIN = main.c
+SRC_BPF  = xdp_tx_kern.c
+OBJ_BPF  = xdp_tx_kern.o
+TARGET   = tx_program
 
-xdp_tx_kern.o: xdp_tx_kern.c
-	$(CLANG) $(CLANGFLAGS) xdp_tx_kern.c -o xdp_tx_kern.o
+.PHONY: all clean
+
+all: $(TARGET)
+
+# Compila solo il main.c (sempre funzionante)
+$(TARGET): $(SRC_MAIN)
+	$(CC) $(CFLAGS) $(SRC_MAIN) -o $(TARGET) $(LDFLAGS)
+
+# Compila BPF/XDP solo se vuoi usare XDP
+$(OBJ_BPF): $(SRC_BPF)
+	$(CLANG) $(BPF_CFLAGS) -c $(SRC_BPF) -o $(OBJ_BPF)
 
 clean:
-	rm -f tx_program xdp_tx_kern.o
+	rm -f $(TARGET) $(OBJ_BPF)
