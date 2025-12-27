@@ -15,9 +15,6 @@
 #include <net/if.h>
 #include <ifaddrs.h>
 
-#include <bpf/xsk.h>
-#include <bpf/libbpf.h>
-
 /* ================= CONFIG ================= */
 #define MAX_PKT_SIZE 1500
 #define DEFAULT_RATE_PPS 20000
@@ -42,12 +39,8 @@ struct packet {
 static uint16_t checksum(uint16_t *buf, size_t len)
 {
     uint32_t sum = 0;
-    while (len > 1) {
-        sum += *buf++;
-        len -= 2;
-    }
-    if (len)
-        sum += *(uint8_t *)buf;
+    while (len > 1) { sum += *buf++; len -= 2; }
+    if (len) sum += *(uint8_t *)buf;
 
     sum = (sum >> 16) + (sum & 0xffff);
     sum += (sum >> 16);
@@ -58,18 +51,14 @@ static uint16_t checksum(uint16_t *buf, size_t len)
 static int autodetect_iface(const char *dst_ip, char *iface, size_t len)
 {
     int sock = socket(AF_INET, SOCK_DGRAM, 0);
-    if (sock < 0)
-        return -1;
+    if (sock < 0) return -1;
 
     struct sockaddr_in dst = {0};
     dst.sin_family = AF_INET;
     dst.sin_port = htons(53);
     inet_pton(AF_INET, dst_ip, &dst.sin_addr);
 
-    if (connect(sock, (struct sockaddr *)&dst, sizeof(dst)) < 0) {
-        close(sock);
-        return -1;
-    }
+    if (connect(sock, (struct sockaddr *)&dst, sizeof(dst)) < 0) { close(sock); return -1; }
 
     struct sockaddr_in src = {0};
     socklen_t slen = sizeof(src);
@@ -79,13 +68,9 @@ static int autodetect_iface(const char *dst_ip, char *iface, size_t len)
     getifaddrs(&ifaddr);
 
     for (ifa = ifaddr; ifa; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr)
-            continue;
-
+        if (!ifa->ifa_addr) continue;
         if (ifa->ifa_addr->sa_family == AF_INET) {
-            struct sockaddr_in *in =
-                (struct sockaddr_in *)ifa->ifa_addr;
-
+            struct sockaddr_in *in = (struct sockaddr_in *)ifa->ifa_addr;
             if (in->sin_addr.s_addr == src.sin_addr.s_addr) {
                 strncpy(iface, ifa->ifa_name, len - 1);
                 freeifaddrs(ifaddr);
@@ -158,10 +143,7 @@ static void parse_cli(int argc, char **argv, struct opts *o)
 static void udp_tx(struct packet *p, struct opts *o)
 {
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_RAW);
-    if (s < 0) {
-        perror("socket");
-        return;
-    }
+    if (s < 0) { perror("socket"); return; }
 
     int one = 1;
     setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one));
@@ -174,8 +156,7 @@ static void udp_tx(struct packet *p, struct opts *o)
     uint64_t sent = 0;
 
     while (time(NULL) - start < o->duration) {
-        sendto(s, p->buf, p->len, 0,
-               (struct sockaddr *)&dst, sizeof(dst));
+        sendto(s, p->buf, p->len, 0, (struct sockaddr *)&dst, sizeof(dst));
         sent++;
     }
 
